@@ -74,8 +74,8 @@ def get_argparser():
     # Train options
     parser.add_argument("--total_itrs", type=int, default=1600,
                         help="epoch number (default: 1.6k)")
-    parser.add_argument("--loss_type", type=str, default='entropydice',
-                        help="criterion (default: ce+dl)")
+    parser.add_argument("--loss_type", type=str, default='dice',
+                        help="criterion (default: Dice)")
     parser.add_argument("--optim", type=str, default='SGD',
                         help="optimizer (default: SGD)")
     parser.add_argument("--weight_decay", type=float, default=5e-4,

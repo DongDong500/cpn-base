@@ -31,7 +31,6 @@ class EarlyStopping:
         self.early_stop = False
         self.ckpt = ckpt
 
-
     def __call__(self, score, model, optimizer, scheduler, cur_epoch):
 
         

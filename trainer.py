@@ -27,7 +27,7 @@ def add_writer_scalar(writer, phase, score, loss, epoch):
     writer.add_scalar(f'Dice Nerve/{phase}', score['Class F1'][1], epoch)
     writer.add_scalar(f'epoch loss/{phase}', loss, epoch)
 
-def set_optim(args, model, backbone):
+def set_optim(args, model, ):
 
     optimizer = [None, None]
     scheduler = [None, None]
@@ -40,13 +40,13 @@ def set_optim(args, model, backbone):
             ], lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay )
         elif args.optim == "RMSprop":
             optimizer[0] = torch.optim.RMSprop(params=[
-            {'params': model.backbone.parameters(), 'lr': 0.1 * args.lr},
-            {'params': model.classifier.parameters(), 'lr': args.lr},
+            {'params': model.encoder.parameters(), 'lr': 0.1 * args.lr},
+            {'params': model.decoder.parameters(), 'lr': args.lr},
             ], lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay )
         elif args.optim == "Adam":
             optimizer[0] = torch.optim.Adam(params=[
-            {'params': model.backbone.parameters(), 'lr': 0.1 * args.lr},
-            {'params': model.classifier.parameters(), 'lr': args.lr},
+            {'params': model.encoder.parameters(), 'lr': 0.1 * args.lr},
+            {'params': model.decoder.parameters(), 'lr': args.lr},
             ], lr=args.lr, betas=(0.9, 0.999), eps=1e-8 )
         else:
             raise NotImplementedError
@@ -62,10 +62,7 @@ def set_optim(args, model, backbone):
                 model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum )
         else:
             raise NotImplementedError
-    ### Optimizer (Backbone)
-    optimizer[1] = torch.optim.SGD(
-                    backbone.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum )
-
+    
     ### Scheduler (Segmentation)
     if args.lr_policy == 'lambdaLR':
         scheduler[0] = torch.optim.lr_scheduler.LambdaLR(
@@ -90,10 +87,7 @@ def set_optim(args, model, backbone):
             optimizer=optimizer[0], )
     else:
         raise NotImplementedError
-    ### Scheduler (backbone)
-    scheduler[1] = torch.optim.lr_scheduler.StepLR(
-                    optimizer=optimizer[1], step_size=args.step_size )
-
+    
     return optimizer, scheduler
 
 def get_pnt(pnt, crop_size):
@@ -156,82 +150,58 @@ def recover(mas, cmas, anchor, devices, crop_size=256):
     
     return result
 
-def train_epoch(devices, model, backbone, loader, optimizer, scheduler, metrics, args):
+def train_epoch(devices, model, loader, optimizer, scheduler, metrics, args):
 
     model.train()
-    backbone.train()
     metrics.reset()
     running_loss = [0.0, 0.0]
 
     loss_func = criterion.get_criterion.__dict__[args.loss_type]()
-    mse = criterion.get_criterion.__dict__['mseloss']()
 
     for i, (ims, lbls) in tqdm(enumerate(loader), total=len(loader)):
         optimizer[0].zero_grad()
-        optimizer[1].zero_grad()
 
         ims = ims.to(devices)
         mas = lbls[0].to(devices)
-        bbox = lbls[1].to(devices)
 
-        anchor = backbone(ims)
-        mse_loss = mse(anchor, bbox)
-        mse_loss.backward()
-
-        cims, cmas = crop(ims, mas, bbox, devices, crop_size=256)
-
-        outputs = model(cims)
+        outputs = model(ims)
         probs = nn.Softmax(dim=1)(outputs)
-        preds = recover(mas, torch.max(probs, 1)[1], bbox, devices, crop_size=256)
-        true = mas.detach().cpu().numpy()
+        preds = torch.max(probs, 1)[1].detach().cpu().numpy()
 
-        loss = loss_func(outputs, cmas)
+        loss = loss_func(outputs, mas)
         loss.backward()
         optimizer[0].step()
-        optimizer[1].step()
-        metrics.update(true, preds.detach().cpu().numpy())
+        metrics.update(mas.detach().cpu().numpy(), preds.detach().cpu().numpy())
 
         running_loss[0] += loss.item() * ims.size(0)
-        running_loss[1] += mse_loss.item() * ims.size(0)
     scheduler[0].step()
-    scheduler[1].step()
     epoch_loss = [running_loss[0] / len(loader.dataset), running_loss[1] / len(loader.dataset)]
     score = metrics.get_results()
 
     return epoch_loss, score
 
-def val_epoch(devices, model, backbone, loader, metrics, args):
+def val_epoch(devices, model, loader, metrics, args):
 
     model.eval()
-    backbone.eval()
     metrics.reset()
     running_loss = [0.0, 0.0]
 
     loss_func = criterion.get_criterion.__dict__[args.loss_type]()
-    mse = criterion.get_criterion.__dict__['mseloss']()
 
     with torch.no_grad():
         for i, (ims, lbls) in tqdm(enumerate(loader), total=len(loader)):
 
             ims = ims.to(devices)
             mas = lbls[0].to(devices)
-            bbox = lbls[1].to(devices)
 
-            anchor = backbone(ims)
-            mse_loss = mse(anchor, bbox)
-
-            cims, cmas = crop(ims, mas, bbox, devices, crop_size=256)
-
-            outputs = model(cims)
+            outputs = model(ims)
             probs = nn.Softmax(dim=1)(outputs)
-            preds = recover(mas, torch.max(probs, 1)[1], bbox, devices, crop_size=256)
-            true = mas.detach().cpu().numpy()
+            preds = torch.max(probs, 1)[1].detach().cpu().numpy()
             
-            loss = loss_func(outputs, cmas)
-            metrics.update(true, preds.detach().cpu().numpy())
+            loss = loss_func(outputs, mas)
+            metrics.update(mas.detach().cpu().numpy(), preds.detach().cpu().numpy())
 
             running_loss[0] += loss.item() * ims.size(0)
-            running_loss[1] += mse_loss.item() * ims.size(0)
         epoch_loss = [running_loss[0] / len(loader.dataset), running_loss[1] / len(loader.dataset)]
         score = metrics.get_results()
 
@@ -251,10 +221,9 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
 
     ### Load model
     model = models.models.__dict__[args.model]()
-    backbone = models.models.__dict__['backbone_resnet50']()
 
     ### Set up optimizer and scheduler
-    optimizer, scheduler = set_optim(args, model, backbone)
+    optimizer, scheduler = set_optim(args, model, )
 
     ### Resume models, schedulers and optimizer
     if args.resume:
@@ -266,36 +235,26 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
     if torch.cuda.device_count() > 1:
         print('cuda multiple GPUs')
         model = nn.DataParallel(model)
-        backbone = nn.DataParallel(backbone)
     model.to(devices)
-    backbone.to(devices)
 
     ### Set up metrics
     metrics = utils.StreamSegMetrics(n_classes=2)
     early_stop = utils.EarlyStopping(patience=args.patience, delta=args.delta, verbose=True, 
                     path=os.path.join(args.BP_pth, RUN_ID, DATA_FOLD), ceiling=True, )
-    backbone_stop = utils.EarlyStopping(patience=args.patience, delta=args.delta, verbose=True, 
-                        path=os.path.join(args.BP_pth, RUN_ID, DATA_FOLD), ceiling=False, ckpt='backbone.pt')
+    
     ### Train
     for epoch in range(resume_epoch, args.total_itrs):
-        epoch_loss, score = train_epoch(devices, model, backbone, loader[0], optimizer, scheduler, metrics, args)
+        epoch_loss, score = train_epoch(devices, model, loader[0], optimizer, scheduler, metrics, args)
         print_result('train', score, epoch, args.total_itrs, epoch_loss[0])
         add_writer_scalar(writer, 'train', score, epoch_loss[0], epoch)
-        print(f"MSE Loss: {epoch_loss[1]:.5f}")
-        writer.add_scalar('MSE epoch loss/train', epoch_loss[1], epoch)
-
-        epoch_loss, score = val_epoch(devices, model, backbone, loader[1], metrics, args)
+        
+        epoch_loss, score = val_epoch(devices, model, loader[1], metrics, args)
         print_result('val', score, epoch, args.total_itrs, epoch_loss[0])
         add_writer_scalar(writer, 'val', score, epoch_loss[0], epoch)
-        print(f"MSE Loss: {epoch_loss[1]:.5f}")
-        writer.add_scalar('MSE epoch loss/val', epoch_loss[1], epoch)
-
+        
         if early_stop(score['Class F1'][1], model, optimizer[0], scheduler[0], epoch):
             best_score = score
             best_loss = epoch_loss
-
-        if backbone_stop(epoch_loss[1], backbone, optimizer[1], scheduler[1], epoch):
-            pass
 
         if early_stop.early_stop:
             print("Early Stop !!!")
