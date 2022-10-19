@@ -1,10 +1,13 @@
 from torchsummary import summary
 import torch
 
-if __name__ == "__main__":
-    import models
+import models
+from get_argparser import get_argparser
 
-    net = models.models.__dict__['backbone_resnet50']()
+if __name__ == "__main__":
+    args = get_argparser().parse_args()
+
+    net = models.models.__dict__['medt'](args, )
     
     inputs = torch.rand(5, 3, 640, 640)
     print(summary(net, (3, 640, 640), device='cpu'))

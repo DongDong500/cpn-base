@@ -9,22 +9,11 @@ from torchvision.models import resnet50, resnet101, ResNet50_Weights, ResNet101_
 from torchvision.models import ResNet
 from torchvision.models.resnet import Bottleneck
 
-class _Backbone_resnet50(ResNet):
-
-    def __init__(self, weights: Optional[ResNet50_Weights] = ResNet50_Weights.IMAGENET1K_V2):
-        super(_Backbone_resnet50, self).__init__(block=Bottleneck, layers=[3, 4, 6, 3])
-        weights = ResNet50_Weights.verify(weights)
-        super().load_state_dict(weights.get_state_dict(progress=True))
-        self.additional_layer = nn.Linear(1000, 2)
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = super().forward(x)
-        return self.additional_layer(x)
+from .unet import Unet
+from .axialnet import ResAxialAttentionUNet, medt_net, AxialBlock, AxialBlock_dynamic, AxialBlock_wopos
 
 
-def deeplabv3plus_resnet50(encoder_name='resnet50', encoder_depth=5, encoder_weights='imagenet', encoder_output_stride=16, 
-                            decoder_channels=256, decoder_atrous_rates=(12, 24, 36), in_channels=3, classes=2, 
-                            activation=None, upsampling=4, aux_params=None, **kwargs):
+def deeplabv3plus_resnet50(args, **kwargs):
     """Constructs a DeepLabV3+ model with a ResNet-50 backbone.
 
     Args:
@@ -55,30 +44,84 @@ def deeplabv3plus_resnet50(encoder_name='resnet50', encoder_depth=5, encoder_wei
                                 - activation (str): An activation function to apply “sigmoid”/”softmax” 
                                 (could be None to return logits)
     """
-    return SMP.DeepLabV3Plus(encoder_name='resnet50', encoder_depth=encoder_depth, encoder_weights=encoder_weights, encoder_output_stride=encoder_output_stride, 
-                                decoder_channels=decoder_channels, decoder_atrous_rates=decoder_atrous_rates, in_channels=in_channels, classes=classes, 
-                                activation=activation, upsampling=upsampling, aux_params=aux_params)
+    encoder_name = 'resnet50'
+    encoder_depth = args.encoder_depth
+    encoder_weights = args.encoder_weights
+    encoder_output_stride = args.encoder_output_stride
+    decoder_atrous_rates = args.decoder_atrous_rates
+    decoder_channels = args.decoder_channels
+    in_channels = args.in_channels
+    classes = args.classes
+    activation = args.activation
+    upsampling = args.upsampling
+    aux_params = args.aux_params
 
-def deeplabv3plus_resnet101(encoder_name, encoder_depth, encoder_weights, encoder_output_stride, 
-                            decoder_channels, decoder_atrous_rates, in_channels, classes, 
-                            activation, upsampling, aux_params, **kwargs):
+    return SMP.DeepLabV3Plus(encoder_name=encoder_name, 
+                            encoder_depth=encoder_depth, 
+                            encoder_weights=encoder_weights, 
+                            encoder_output_stride=encoder_output_stride, 
+                            decoder_channels=decoder_channels, 
+                            decoder_atrous_rates=decoder_atrous_rates, 
+                            in_channels=in_channels, 
+                            classes=classes, 
+                            activation=activation, 
+                            upsampling=upsampling, 
+                            aux_params=aux_params )
 
-    return SMP.DeepLabV3Plus(encoder_name='resnet101', encoder_depth=encoder_depth, encoder_weights=encoder_weights, encoder_output_stride=encoder_output_stride, 
-                                decoder_channels=decoder_channels, decoder_atrous_rates=decoder_atrous_rates, in_channels=in_channels, classes=classes, 
-                                activation=activation, upsampling=upsampling, aux_params=aux_params)
+def deeplabv3plus_resnet101(args, **kwargs):
+    """Constructs a DeepLabV3+ model with a ResNet-101 backbone."""
 
-def vit(**kwargs, ):
+    encoder_name = 'resnet101'
+    encoder_depth = args.encoder_depth
+    encoder_weights = args.encoder_weights
+    encoder_output_stride = args.encoder_output_stride
+    decoder_atrous_rates = args.decoder_atrous_rates
+    decoder_channels = args.decoder_channels
+    in_channels = args.in_channels
+    classes = args.classes
+    activation = args.activation
+    upsampling = args.upsampling
+    aux_params = args.aux_params
 
-    return ViT(**kwargs)
+    return SMP.DeepLabV3Plus(encoder_name=encoder_name, 
+                            encoder_depth=encoder_depth, 
+                            encoder_weights=encoder_weights, 
+                            encoder_output_stride=encoder_output_stride, 
+                            decoder_channels=decoder_channels, 
+                            decoder_atrous_rates=decoder_atrous_rates, 
+                            in_channels=in_channels, 
+                            classes=classes, 
+                            activation=activation, 
+                            upsampling=upsampling, 
+                            aux_params=aux_params )
 
-def unet(**kwargs, ):
-    """ U-Net: Convolutional Networks for Biomedical Image Segmentation.
-    """
-    from .unet import Unet
+def unet(args, **kwargs, ):
+    """U-Net: Convolutional Networks for Biomedical Image Segmentation."""
+    
     return Unet(n_channels=3, n_classes=2, )
 
-def backbone_resnet50(**kwargs, ):
+"""
+Medical Transformer: Gated Axial-Attention for Medical Image Segmentation
 
-    x = 1
-    
-    return _Backbone_resnet50()
+"""
+def axialunet(pretrained=False, **kwargs):
+    model = ResAxialAttentionUNet(AxialBlock, [1, 2, 4, 1], s= 0.125, **kwargs)
+    return model
+
+def gated(pretrained=False, **kwargs):
+    model = ResAxialAttentionUNet(AxialBlock_dynamic, [1, 2, 4, 1], s= 0.125, **kwargs)
+    return model
+
+def medt(args, pretrained=False, **kwargs):
+    img_size = args.MedT_img_size
+    model = medt_net(AxialBlock_dynamic,AxialBlock_wopos, [1, 2, 4, 1], s=0.125, img_size=img_size,  **kwargs)
+    return model
+
+def logo(pretrained=False, **kwargs):
+    model = medt_net(AxialBlock,AxialBlock, [1, 2, 4, 1], s= 0.125, **kwargs)
+    return model
+
+
+def vit(args, **kwargs, ):
+
+    return ViT(**kwargs)

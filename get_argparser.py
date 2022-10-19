@@ -52,6 +52,16 @@ def get_argparser():
                         help='Final upsampling factor. Default is 4 to preserve input-output spatial shape identity')
     parser.add_argument("--aux_params", type=dict, default=None,
                         help='Dictionary with parameters of the auxiliary output (classification head)')
+    # MedT options
+    parser.add_argument("--MedT_zero_init_residual", type=bool, default=True)
+    parser.add_argument("--MedT_groups", type=int, default=8)
+    parser.add_argument("--MedT_width_per_group", type=int, default=64)
+    parser.add_argument("--MedT_replace_stride_with_dilation", default=None)
+    parser.add_argument("--MedT_norm_layer", default=None)
+    parser.add_argument("--MedT_s", type=float, default=0.125)
+    parser.add_argument("--MedT_imgchan", type=int, default=3)
+    parser.add_argument("--MedT_img_size", type=int, default=640,
+                        help='MedT input image size')
 
     # Dataset options
     parser.add_argument("--num_workers", type=int, default=8, 
@@ -64,8 +74,8 @@ def get_argparser():
                         help="kfold (default: 5)")
     parser.add_argument("--k", type=int, default=0, 
                         help="i-th fold set of kfold data (default: 0)")
-    parser.add_argument("--train_batch_size", type=int, default=8, 
-                        help='train batch size (default: 8)')
+    parser.add_argument("--train_batch_size", type=int, default=4, 
+                        help='train batch size (default: 4)')
     parser.add_argument("--val_batch_size", type=int, default=4, 
                         help='validate batch size (default: 4)') 
     parser.add_argument("--test_batch_size", type=int, default=16, 
@@ -74,8 +84,8 @@ def get_argparser():
     # Train options
     parser.add_argument("--total_itrs", type=int, default=1600,
                         help="epoch number (default: 1.6k)")
-    parser.add_argument("--loss_type", type=str, default='dice',
-                        help="criterion (default: Dice)")
+    parser.add_argument("--loss_type", type=str, default='entropydice',
+                        help="criterion (default: entropy+dice)")
     parser.add_argument("--optim", type=str, default='SGD',
                         help="optimizer (default: SGD)")
     parser.add_argument("--weight_decay", type=float, default=5e-4,

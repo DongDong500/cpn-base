@@ -166,7 +166,7 @@ def train_epoch(devices, model, loader, optimizer, scheduler, metrics, args):
 
         outputs = model(ims)
         probs = nn.Softmax(dim=1)(outputs)
-        preds = torch.max(probs, 1)[1].detach().cpu().numpy()
+        preds = torch.max(probs, 1)[1]
 
         loss = loss_func(outputs, mas)
         loss.backward()
@@ -196,7 +196,7 @@ def val_epoch(devices, model, loader, metrics, args):
 
             outputs = model(ims)
             probs = nn.Softmax(dim=1)(outputs)
-            preds = torch.max(probs, 1)[1].detach().cpu().numpy()
+            preds = torch.max(probs, 1)[1]
             
             loss = loss_func(outputs, mas)
             metrics.update(mas.detach().cpu().numpy(), preds.detach().cpu().numpy())
@@ -220,7 +220,7 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
     loader = utils.get_loader(args, )
 
     ### Load model
-    model = models.models.__dict__[args.model]()
+    model = models.models.__dict__[args.model](args, )
 
     ### Set up optimizer and scheduler
     optimizer, scheduler = set_optim(args, model, )
