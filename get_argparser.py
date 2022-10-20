@@ -74,8 +74,8 @@ def get_argparser():
                         help="kfold (default: 5)")
     parser.add_argument("--k", type=int, default=0, 
                         help="i-th fold set of kfold data (default: 0)")
-    parser.add_argument("--train_batch_size", type=int, default=4, 
-                        help='train batch size (default: 4)')
+    parser.add_argument("--train_batch_size", type=int, default=16, 
+                        help='train batch size (default: 16)')
     parser.add_argument("--val_batch_size", type=int, default=4, 
                         help='validate batch size (default: 4)') 
     parser.add_argument("--test_batch_size", type=int, default=16, 

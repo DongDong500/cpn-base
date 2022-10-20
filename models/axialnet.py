@@ -513,7 +513,7 @@ class medt_net(nn.Module):
 
     def __init__(self, block, block_2, layers, num_classes=2, zero_init_residual=True,
                  groups=8, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None, s=0.125, img_size = 128,imgchan = 3):
+                 norm_layer=None, s=0.125, img_size = 128, imgchan = 3):
         super(medt_net, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -713,21 +713,5 @@ class medt_net(nn.Module):
     def forward(self, x):
         return self._forward_impl(x)
 
-
-def axialunet(pretrained=False, **kwargs):
-    model = ResAxialAttentionUNet(AxialBlock, [1, 2, 4, 1], s= 0.125, **kwargs)
-    return model
-
-def gated(pretrained=False, **kwargs):
-    model = ResAxialAttentionUNet(AxialBlock_dynamic, [1, 2, 4, 1], s= 0.125, **kwargs)
-    return model
-
-def MedT(pretrained=False, **kwargs):
-    model = medt_net(AxialBlock_dynamic,AxialBlock_wopos, [1, 2, 4, 1], s= 0.125,  **kwargs)
-    return model
-
-def logo(pretrained=False, **kwargs):
-    model = medt_net(AxialBlock,AxialBlock, [1, 2, 4, 1], s= 0.125, **kwargs)
-    return model
 
 # EOF
